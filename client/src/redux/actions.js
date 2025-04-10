@@ -7,7 +7,6 @@ export function openConnection(payload) {
 
     if (!payload.id) {
       id = await fetch(`${API_URL}/id`).then((res) => res.json());
-      //localStorage.setItem('id', id.id)
       dispatch({
         type: "FETCH_ID_SUCCESS",
         payload: id,

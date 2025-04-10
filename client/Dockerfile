@@ -8,8 +8,8 @@ COPY . .
 
 ARG VITE_API_URL
 ARG VITE_WS_URL
-RUN echo "VITE_API_URL=${VITE_API_URL:-http://localhost:5006}" > .env
-RUN echo "VITE_WS_URL=${VITE_WS_URL:-ws://localhost:5006}" >> .env
+ENV VITE_API_URL=${VITE_API_URL:-http://localhost:5006}
+ENV VITE_WS_URL=${VITE_WS_URL:-ws://localhost:5006}
 
 RUN npm run build
 
