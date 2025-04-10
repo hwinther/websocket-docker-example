@@ -1,25 +1,56 @@
-import { Client } from 'pg'
-const connectionString = 'postgres://postgres:password@postgres:5432/chat'
+import pg from "pg";
+const { Pool } = pg;
 
-const client = new Client({
-  connectionString: connectionString,
-})
+const connectionString = process.env.POSTGRES_CONNECTION_URI || "postgres://postgres:password@postgres:5432/chat";
 
-client.connect()
+const pool = new Pool({
+  connectionString,
+});
 
-const table = `
-  CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+const initTable = async () => {
+  const client = await pool.connect();
+  try {
+    // First check if table exists
+    const tableExists = await client.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'messages'
+      );
+    `);
 
-  CREATE TABLE messages(id UUID PRIMARY KEY DEFAULT gen_random_uuid(), message TEXT, sender INTEGER, createdAt BIGSERIAL)
-`
-
-const messagesQuery = client.query(table, async (err, res) => {
-  if (err) {
-    throw err
+    if (!tableExists.rows[0].exists) {
+      console.log("Messages table does not exist. Creating...");
+      // Create the table if it doesn't exist
+      await client.query(`
+        CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+        DROP TABLE IF EXISTS messages;
+        CREATE TABLE messages(
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(), 
+          message TEXT, 
+          sender INTEGER, 
+          createdAt BIGSERIAL
+        );
+      `);
+      console.log("Messages table created successfully.");
+    } else {
+      console.log("Messages table already exists.");
+    }
+  } catch (err) {
+    console.error("Error initializing database:", err);
+    // Try to create table again after a delay if it failed
+    setTimeout(() => {
+      console.log("Retrying table creation...");
+      initTable().catch(console.error);
+    }, 5000);
+  } finally {
+    client.release();
   }
-  console.log('\n')
-  console.log('Messages Table Created.')
-  await client.end()
-})
+};
 
-export default client
+// Initialize the table
+console.log("Starting database initialization...");
+initTable().catch(err => {
+  console.error("Failed to initialize database:", err);
+});
+
+export default pool;
