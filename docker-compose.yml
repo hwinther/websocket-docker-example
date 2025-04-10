@@ -10,8 +10,8 @@ services:
       dockerfile: Dockerfile
     image: chat/client
     environment:
-      - VITE_API_HOST=localhost
-      - VITE_API_PORT=5006
+      - VITE_API_URL=http://localhost:5006
+      - VITE_WS_URL=ws://localhost:5006
     ports:
       - "5008:8080"
   chat-api:

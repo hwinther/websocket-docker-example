@@ -1,9 +1,5 @@
-const API_URL = `http://${import.meta.env.VITE_API_HOST}:${
-  import.meta.env.VITE_API_PORT
-}`;
-const WS_URL = `ws://${import.meta.env.VITE_API_HOST}:${
-  import.meta.env.VITE_API_PORT
-}`;
+const API_URL = import.meta.env.VITE_API_URL;
+const WS_URL = import.meta.env.VITE_WS_URL;
 
 export function openConnection(payload) {
   return async function (dispatch) {
