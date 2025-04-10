@@ -61,7 +61,7 @@ function Home({ chat, openConnection }) {
       </h2>
       <div className="chat-box">
         <div className="text-area" ref={textArea}>
-          {chat.messages.map((m) => (
+          {(chat.messages || []).map((m) => (
             <Message key={m.id} message={m} id={chat.id} />
           ))}
         </div>
