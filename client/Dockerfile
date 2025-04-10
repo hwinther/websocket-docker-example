@@ -6,10 +6,10 @@ RUN npm install
 
 COPY . .
 
-ARG VITE_API_HOST
-ARG VITE_API_PORT
-RUN echo "VITE_API_HOST=${VITE_API_HOST:-localhost}" > .env
-RUN echo "VITE_API_PORT=${VITE_API_PORT:-5006}" >> .env
+ARG VITE_API_URL
+ARG VITE_WS_URL
+RUN echo "VITE_API_URL=${VITE_API_URL:-http://localhost:5006}" > .env
+RUN echo "VITE_WS_URL=${VITE_WS_URL:-ws://localhost:5006}" >> .env
 
 RUN npm run build
 
