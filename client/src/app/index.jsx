@@ -85,7 +85,7 @@ function Home({ chat, openConnection, sendMessage, startConversation, setActiveC
                 className={`conversation-item ${conv.id === chat.activeConversationId ? 'active' : ''}`}
                 onClick={() => setActiveConversation(conv.id)}
               >
-                <span>{conv.name || `Chat with ${conv.participants.join(', ')}`}</span>
+                <span>{`${conv.name} - Chat with ${conv.participants.filter(id => id !== chat.id).join(', ')}`}</span>
               </div>
             ))}
           </div>
