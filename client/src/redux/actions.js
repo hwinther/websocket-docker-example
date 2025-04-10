@@ -36,6 +36,12 @@ export function openConnection(payload) {
               payload: data.data,
             });
             break;
+          case "usersUpdate":
+            dispatch({
+              type: "USERS_UPDATE",
+              payload: data.data,
+            });
+            break;
         }
       });
 

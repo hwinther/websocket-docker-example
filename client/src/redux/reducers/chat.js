@@ -39,6 +39,11 @@ export default function reducer(state = initialState, action) {
             : conv
         ),
       };
+    case "USERS_UPDATE":
+      return {
+        ...state,
+        availableUsers: payload.availableUsers,
+      };
     default:
       return state;
   }

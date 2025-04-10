@@ -81,9 +81,13 @@ const queries = {
   getMessages:
     "SELECT * FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC",
   getAvailableUsers: `
-    SELECT DISTINCT user_id 
-    FROM conversation_participants 
-    WHERE user_id != $1
+    SELECT DISTINCT u.user_id 
+    FROM (
+      SELECT unnest(ARRAY[${Array.from(connections.keys()).join(
+        ","
+      )}]) as user_id
+    ) u 
+    WHERE u.user_id != $1
   `,
 };
 
@@ -133,22 +137,32 @@ wss.on("connection", async function connection(ws, req) {
   try {
     client = await pool.connect();
 
+    // Store the connection before querying so other users can see this user
+    connections.set(userId, ws);
+
     // Get user's conversations
     const { rows: conversations } = await client.query(
       queries.getConversations,
       [userId]
     );
-    const { rows: availableUsers } = await client.query(
-      queries.getAvailableUsers,
-      [userId]
-    );
+
+    // Update getAvailableUsers query with current connections
+    const availableUsersQuery = `
+      SELECT DISTINCT u.user_id 
+      FROM (
+        SELECT unnest(ARRAY[${Array.from(connections.keys()).join(
+          ","
+        )}]) as user_id
+      ) u 
+      WHERE u.user_id != $1
+    `;
+    const { rows: availableUsers } = await client.query(availableUsersQuery, [
+      userId,
+    ]);
 
     console.log(`Sending initial data to user ${userId}`);
     console.log(`Found ${conversations.length} conversations`);
     console.log(`Found ${availableUsers.length} available users`);
-
-    // Store the connection only after successful data fetch
-    connections.set(userId, ws);
 
     // Send initial data
     if (ws.readyState === ws.OPEN) {
@@ -162,6 +176,22 @@ wss.on("connection", async function connection(ws, req) {
         })
       );
     }
+
+    // Notify other connected clients about the new user
+    connections.forEach((clientWs, clientId) => {
+      if (clientId !== userId && clientWs.readyState === WebSocket.OPEN) {
+        clientWs.send(
+          JSON.stringify({
+            type: "usersUpdate",
+            data: {
+              availableUsers: Array.from(connections.keys()).filter(
+                (id) => id !== clientId
+              ),
+            },
+          })
+        );
+      }
+    });
   } catch (err) {
     console.error(`Error fetching initial data for user ${userId}:`, err);
     if (ws.readyState === ws.OPEN) {
