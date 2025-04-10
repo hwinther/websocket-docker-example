@@ -13,7 +13,7 @@ services:
       - VITE_API_URL=http://localhost:5006
       - VITE_WS_URL=ws://localhost:5006
     ports:
-      - "5008:8080"
+      - "5008:80"
   chat-api:
     build:
       context: ./api
@@ -22,7 +22,7 @@ services:
     environment:
       - POSTGRES_CONNECTION_URI=postgres://postgres:password@postgres:5432/chat
     ports:
-      - "5006:3000"
+      - "5006:80"
     depends_on:
       postgres:
         condition: service_healthy
