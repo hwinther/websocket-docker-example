@@ -1,13 +1,11 @@
-FROM node:8
+FROM node:20-slim
 
-ADD . /code
 WORKDIR /code
 
-ADD package.json .
+COPY package*.json ./
 
-RUN npm install forever -g
 RUN npm install
 
 COPY . .
 
-CMD ["forever", "index.js"]
+CMD ["node", "src/index.js"]

@@ -1,114 +1,109 @@
-import express from 'express'
-import bodyParser from 'body-parser'
-import cors from 'cors'
-import WebSocket from 'ws'
-import url from 'url'
-import http from 'http'
+import express from "express";
+import bodyParser from "body-parser";
+import cors from "cors";
+import { WebSocketServer } from "ws";
+import http from "http";
+import pool from "../models/index.js";
 
-import { Client } from 'pg'
-const connectionString = 'postgres://postgres:password@postgres:5432/chat'
+const PORT = 3000;
+const app = express();
 
-import initClient from '../models'
-
-const PORT = 3000
-const app = express()
-
-app.use(bodyParser.json())
-app.use(cors())
+app.use(bodyParser.json());
+app.use(cors());
 
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocketServer({ server });
 
-const connections = {} // pair off connections by 2's {0,1}, {2,3}
+const connections = {}; // pair off connections by 2's {0,1}, {2,3}
 
-wss.on('connection', async function connection(ws, req) {
-  const id = url.parse(req.url, true).query.id
+const queries = {
+  newMessage:
+    "INSERT INTO messages(message, sender, createdAt) VALUES($1, $2, $3)",
+  getMessages: "SELECT * FROM messages WHERE sender = $1 OR sender = $2",
+};
 
-  const newMessage = 'INSERT INTO messages(message, sender, createdAt) VALUES($1 , $2, $3)'
-  const getMessages = 'SELECT * FROM messages WHERE sender = $1 OR sender = $2'
+wss.on("connection", async function connection(ws, req) {
+  const params = new URLSearchParams(req.url.slice(1));
+  const id = params.get("id");
 
   connections[id] = {
     sender: id,
-    ws
-  }
+    ws,
+  };
 
-  ws.on('message', async function incoming(message) {
-    const parsedMessage = JSON.parse(message)
+  ws.on("message", async function incoming(message) {
+    const parsedMessage = JSON.parse(message);
+    const client = await pool.connect();
 
-    // open up a new client to the DB
-    const client = new Client({
-      connectionString: connectionString,
-    })
-    await client.connect()
+    try {
+      // Insert new message
+      await client.query(queries.newMessage, [
+        parsedMessage.message,
+        parsedMessage.sender,
+        parsedMessage.createdAt,
+      ]);
 
-    // Build the query to make a new message
-    const newMessageQuery = {
-      text: newMessage,
-      values: [parsedMessage.message, parsedMessage.sender, parsedMessage.createdAt]
-    }
+      // Calculate the receiver
+      const receiver =
+        parsedMessage.sender % 2 === 0
+          ? parsedMessage.sender + 1
+          : parsedMessage.sender - 1;
 
-    // call query
-    const dbMessage = await client.query(newMessageQuery)
-      .then(res => res)
-      .catch(err => { throw err })
-    
-    // calculate the receiver of the message
-    const receiver = parsedMessage.sender % 2 === 0 ? parsedMessage.sender + 1 : parsedMessage.sender - 1
+      // Get updated messages
+      const { rows: messages } = await client.query(queries.getMessages, [
+        parsedMessage.sender,
+        receiver,
+      ]);
 
-    // build query to get the new messages
-    const getMessagesQuery = {
-      text: getMessages,
-      values: [parsedMessage.sender, receiver]
-    }
+      const sortedMessages = messages.sort(
+        (a, b) => parseInt(a.createdAt, 10) - parseInt(b.createdAt, 10)
+      );
 
-    // call query and sort messages by date
-    const dbMessages = await client.query(getMessagesQuery)
-      .then(res => res.rows.sort((a, b) => parseInt(a.createdAt, 10) >= parseInt(b.created, 10)))
-      .catch(err => { throw err })
+      // Send to sender
+      connections[parsedMessage.sender].ws.send(
+        JSON.stringify({ data: sortedMessages })
+      );
 
-    // send new messages to sender
-    connections[parsedMessage.sender].ws.send(JSON.stringify({ data: dbMessages }))
-
-    // find the "Other" perosn in the chat and send messages
-    if (parsedMessage.sender % 2 === 0) {
-      if (connections[parsedMessage.sender + 1]) {
-        connections[parsedMessage.sender + 1].ws.send(JSON.stringify({ data: dbMessages }))
+      // Send to receiver if connected
+      const receiverConn = connections[receiver];
+      if (receiverConn) {
+        receiverConn.ws.send(JSON.stringify({ data: sortedMessages }));
       }
-    } else {      
-      connections[parsedMessage.sender - 1].ws.send(JSON.stringify({ data: dbMessages }))
-    } 
-    // end client connection
-    client.end()
+    } catch (err) {
+      console.error("Error processing message:", err);
+      ws.send(JSON.stringify({ error: "Failed to process message" }));
+    } finally {
+      client.release();
+    }
   });
 
-  // can assume if ID is an even number then it's a new channel
+  // Load previous messages for odd-numbered IDs
   if (id % 2 === 1) {
-    // since it's odd, we need to see if there's any previous messages
-    const client = new Client({
-      connectionString: connectionString,
-    })
-    await client.connect()
+    const client = await pool.connect();
+    try {
+      const { rows: messages } = await client.query(queries.getMessages, [
+        id,
+        id - 1,
+      ]);
 
-    const getMessagesQuery = {
-      text: getMessages,
-      values: [id, id - 1]
+      const sortedMessages = messages.sort(
+        (a, b) => parseInt(a.createdAt, 10) - parseInt(b.createdAt, 10)
+      );
+
+      connections[id].ws.send(JSON.stringify({ data: sortedMessages }));
+    } catch (err) {
+      console.error("Error loading previous messages:", err);
+      ws.send(JSON.stringify({ error: "Failed to load messages" }));
+    } finally {
+      client.release();
     }
-
-    const dbMessages = await client.query(getMessagesQuery)
-      .then(res => res.rows.sort((a, b) => parseInt(a.createdAt, 10) >= parseInt(b.created, 10)))
-      .catch(err => { throw err })
-
-    connections[id].ws.send(JSON.stringify({ data: dbMessages }))
-    client.end()
   }
 });
 
-
 let id = 0;
-app.get('/id', (req, res) => res.status(200).send({ id: id++ }))
+app.get("/id", (req, res) => res.status(200).send({ id: id++ }));
+app.get("/", (req, res) => res.status(200).send("200 OK"));
 
-app.get('/', (req, res) => res.status(200).send('200 OK'))
-
-server.listen(PORT, function listening() {
-  console.log('Listening on %d', server.address().port);
+server.listen(PORT, () => {
+  console.log("Listening on port %d", PORT);
 });

@@ -1,25 +1,36 @@
-import { Client } from 'pg'
-const connectionString = 'postgres://postgres:password@postgres:5432/chat'
+import pg from "pg";
+const { Pool } = pg;
 
-const client = new Client({
-  connectionString: connectionString,
-})
+const connectionString = "postgres://postgres:password@postgres:5432/chat";
 
-client.connect()
+const pool = new Pool({
+  connectionString,
+});
 
-const table = `
-  CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+const initTable = async () => {
+  const client = await pool.connect();
+  try {
+    const table = `
+      CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+      CREATE TABLE IF NOT EXISTS messages(
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(), 
+        message TEXT, 
+        sender INTEGER, 
+        createdAt BIGSERIAL
+      )
+    `;
 
-  CREATE TABLE messages(id UUID PRIMARY KEY DEFAULT gen_random_uuid(), message TEXT, sender INTEGER, createdAt BIGSERIAL)
-`
-
-const messagesQuery = client.query(table, async (err, res) => {
-  if (err) {
-    throw err
+    await client.query(table);
+    console.log("Messages Table Created/Verified.");
+  } catch (err) {
+    console.error("Error initializing database:", err);
+    throw err;
+  } finally {
+    client.release();
   }
-  console.log('\n')
-  console.log('Messages Table Created.')
-  await client.end()
-})
+};
 
-export default client
+// Initialize the table
+initTable().catch(console.error);
+
+export default pool;
