@@ -8,10 +8,10 @@ services:
     build:
       context: ./client
       dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL}
+        - VITE_WS_URL=${VITE_WS_URL}
     image: chat/client
-    environment:
-      - VITE_API_URL=http://localhost:5006
-      - VITE_WS_URL=ws://localhost:5006
     ports:
       - "5008:80"
   chat-api:
