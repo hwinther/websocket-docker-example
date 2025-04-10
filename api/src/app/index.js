@@ -104,6 +104,43 @@ let id = 0;
 app.get("/id", (req, res) => res.status(200).send({ id: id++ }));
 app.get("/", (req, res) => res.status(200).send("200 OK"));
 
-server.listen(PORT, () => {
+const httpServer = server.listen(PORT, () => {
   console.log("Listening on port %d", PORT);
 });
+
+// Graceful shutdown handling
+const shutdown = async () => {
+  console.log("Received shutdown signal, closing connections...");
+
+  // Close all WebSocket connections
+  wss.clients.forEach((client) => {
+    client.close();
+  });
+  wss.close();
+
+  // Close HTTP server with a 10 second timeout
+  httpServer.close((err) => {
+    if (err) {
+      console.error("Error closing HTTP server:", err);
+      process.exit(1);
+    }
+  });
+
+  // Close database pool
+  try {
+    await pool.end();
+    console.log("Database pool closed");
+  } catch (err) {
+    console.error("Error closing database pool:", err);
+  }
+
+  // Force exit after 3 seconds
+  setTimeout(() => {
+    console.log("Forcing shutdown after timeout");
+    process.exit(1);
+  }, 3000);
+};
+
+// Listen for shutdown signals
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
