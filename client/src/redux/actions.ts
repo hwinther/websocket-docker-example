@@ -1,10 +1,13 @@
+import { Dispatch } from "redux";
+import { WebSocketMessage, ChatState } from "../types";
 import WebSocketService from "./websocket";
+import { logger } from "../utils/logger";
 
 const API_URL = import.meta.env.VITE_API_URL;
 const WS_URL = import.meta.env.VITE_WS_URL;
 
-export function openConnection(payload) {
-  return async function (dispatch) {
+export function openConnection(payload: { id?: number }) {
+  return async function (dispatch: Dispatch) {
     let id = null;
 
     if (!payload.id) {
@@ -16,7 +19,7 @@ export function openConnection(payload) {
     }
 
     try {
-      WebSocketService.setMessageHandler((data) => {
+      WebSocketService.setMessageHandler((data: WebSocketMessage) => {
         switch (data.type) {
           case "init":
             dispatch({
@@ -48,14 +51,14 @@ export function openConnection(payload) {
       await WebSocketService.connect(`${WS_URL}?id=${id ? id.id : payload.id}`);
       dispatch({ type: "WEBSOCKET_CONNECTED" });
     } catch (error) {
-      console.error("WebSocket connection error:", error);
+      logger.error("WebSocket connection error:", error);
       dispatch({ type: "WEBSOCKET_DISCONNECTED" });
     }
   };
 }
 
-export function sendMessage(message, conversationId) {
-  return function (dispatch, getState) {
+export function sendMessage(message: string, conversationId: string) {
+  return function (_dispatch: Dispatch, getState: () => { chat: ChatState }) {
     const { chat } = getState();
     if (message && chat.connected) {
       WebSocketService.send({
@@ -67,8 +70,8 @@ export function sendMessage(message, conversationId) {
   };
 }
 
-export function startConversation(name, participants) {
-  return function (dispatch, getState) {
+export function startConversation(name: string, participants: number[]) {
+  return function (_dispatch: Dispatch, getState: () => { chat: ChatState }) {
     const { chat } = getState();
     if (chat.connected) {
       WebSocketService.send({
@@ -80,7 +83,7 @@ export function startConversation(name, participants) {
   };
 }
 
-export function setActiveConversation(conversationId) {
+export function setActiveConversation(conversationId: string) {
   return {
     type: "SET_ACTIVE_CONVERSATION",
     payload: conversationId,

@@ -1,9 +1,9 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import Message from '../message';
+import { Message as MessageType } from '../../../types';
 
 describe('Message Component', () => {
-  const mockMessage = {
+  const mockMessage: MessageType = {
     message: 'Hello World',
     sender: 1
   };

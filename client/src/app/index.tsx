@@ -1,29 +1,31 @@
 import React, { useEffect, useRef, useState } from "react";
-import PropTypes from "prop-types";
 import { connect } from "react-redux";
-import { bindActionCreators } from "redux";
+import { bindActionCreators, Dispatch } from "redux";
 
-import Message from "./components/message.jsx";
+import Message from "./components/message";
 import "./styles.css";
 import * as actions from "../redux/actions";
 import WebSocketService from "../redux/websocket";
+import { ChatState, ChatActions } from "../types";
 
-const mapStateToProps = (state) => ({ chat: state.chat });
-const mapDispatchToProps = (dispatch) => bindActionCreators(actions, dispatch);
+const mapStateToProps = (state: { chat: ChatState }) => ({ chat: state.chat });
+const mapDispatchToProps = (dispatch: Dispatch) => bindActionCreators(actions, dispatch);
 
-function Home({ chat, openConnection, sendMessage, startConversation, setActiveConversation }) {
+type Props = ReturnType<typeof mapStateToProps> & ChatActions;
+
+function Home({ chat, openConnection, sendMessage, startConversation, setActiveConversation }: Props) {
   const [message, setMessage] = useState("");
   const [newConversationName, setNewConversationName] = useState("");
-  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
   const [showNewChat, setShowNewChat] = useState(false);
-  const textArea = useRef(null);
+  const textArea = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    openConnection({ id: chat.id });
+    openConnection({ id: chat.id ?? undefined });
     return () => {
       WebSocketService.disconnect();
     };
-  }, []);
+  }, [openConnection, chat.id]);
 
   useEffect(() => {
     if (textArea.current) {
@@ -31,7 +33,7 @@ function Home({ chat, openConnection, sendMessage, startConversation, setActiveC
     }
   }, [chat.conversations]);
 
-  const onChange = (event) => {
+  const onChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(event.target.value);
   };
 
@@ -42,7 +44,7 @@ function Home({ chat, openConnection, sendMessage, startConversation, setActiveC
     }
   };
 
-  const handleKeyDown = (event) => {
+  const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === "Enter") {
       send();
     }
@@ -57,7 +59,7 @@ function Home({ chat, openConnection, sendMessage, startConversation, setActiveC
     }
   };
 
-  const toggleUserSelection = (userId) => {
+  const toggleUserSelection = (userId: number) => {
     setSelectedUsers(prev => 
       prev.includes(userId) 
         ? prev.filter(id => id !== userId)
@@ -85,7 +87,7 @@ function Home({ chat, openConnection, sendMessage, startConversation, setActiveC
                 className={`conversation-item ${conv.id === chat.activeConversationId ? 'active' : ''}`}
                 onClick={() => setActiveConversation(conv.id)}
               >
-                <span>{`${conv.name} - Chat with ${conv.participants.filter(id => id !== chat.id).join(', ')}`}</span>
+                <span>{conv.name ?? `Chat with ${conv.participants.filter(id => id !== chat.id).join(', ')}`}</span>
               </div>
             ))}
           </div>
@@ -94,7 +96,7 @@ function Home({ chat, openConnection, sendMessage, startConversation, setActiveC
         <div className="chat-box">
           <div className="text-area" ref={textArea}>
             {messages.map((m) => (
-              <Message key={m.id} message={m} id={chat.id} />
+              <Message key={m.id} message={m} id={chat.id!} />
             ))}
           </div>
 
@@ -162,28 +164,5 @@ function Home({ chat, openConnection, sendMessage, startConversation, setActiveC
     </div>
   );
 }
-
-Home.propTypes = {
-  chat: PropTypes.shape({
-    id: PropTypes.number,
-    connected: PropTypes.bool.isRequired,
-    conversations: PropTypes.arrayOf(PropTypes.shape({
-      id: PropTypes.string,
-      name: PropTypes.string,
-      participants: PropTypes.arrayOf(PropTypes.number),
-      messages: PropTypes.arrayOf(PropTypes.shape({
-        id: PropTypes.string,
-        message: PropTypes.string,
-        sender: PropTypes.number,
-      }))
-    })),
-    activeConversationId: PropTypes.string,
-    availableUsers: PropTypes.arrayOf(PropTypes.number)
-  }).isRequired,
-  openConnection: PropTypes.func.isRequired,
-  sendMessage: PropTypes.func.isRequired,
-  startConversation: PropTypes.func.isRequired,
-  setActiveConversation: PropTypes.func.isRequired
-};
 
 export default connect(mapStateToProps, mapDispatchToProps)(Home);
