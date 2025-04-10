@@ -24,4 +24,9 @@ describe('Message Component', () => {
     render(<Message message={mockMessage} id={1} />);
     expect(screen.getByText('Hello World')).toBeInTheDocument();
   });
+
+  test('displays the sender name', () => {
+    render(<Message message={mockMessage} id={2} />);
+    expect(screen.getByText('User 1')).toBeInTheDocument();
+  });
 });
