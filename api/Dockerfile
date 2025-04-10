@@ -14,7 +14,8 @@ RUN npm install
 
 COPY . .
 
-EXPOSE 3000
+ENV PORT=80
+EXPOSE 80
 
 # Wait for PostgreSQL to be ready before starting the application
 CMD ["/bin/bash", "-c", "/wait-for-it.sh postgres:5432 -t 10 -- node src/index.js"]

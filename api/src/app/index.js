@@ -5,7 +5,7 @@ import { WebSocketServer } from "ws";
 import http from "http";
 import pool from "../models/index.js";
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const app = express();
 
 app.use(bodyParser.json());
